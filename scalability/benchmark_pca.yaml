@@ -99,24 +99,31 @@ stages:
         <<: *ladder
         parameters:
           - uri: file:///home/ben/data/tenx_ladder/tenx-0160k
-      # ---- rungs past here have not been run end to end yet. The two known
-      # ceilings are upstream (scrapper FILT/NORM/FEAT are in-memory R) and on
-      # the GPU (8GB VRAM on this box). Uncomment one rung at a time.
+      # ---- rungs past here have not been run end to end yet. Known ceilings:
+      # in-memory R upstream (scrapper FILT/NORM/FEAT) and 8GB VRAM at PCA.
+      # Uncomment one rung at a time.
       # - id: tenx-0320k
       #   name: "TENx ladder: 320k cells"
       #   <<: *ladder
       #   parameters:
-      #     - uri: file:///home/b/phd/data/tenx_ladder/tenx-0320k
+      #     - uri: file:///home/ben/data/tenx_ladder/tenx-0320k
       # - id: tenx-0640k
       #   name: "TENx ladder: 640k cells"
       #   <<: *ladder
       #   parameters:
-      #     - uri: file:///home/b/phd/data/tenx_ladder/tenx-0640k
+      #     - uri: file:///home/ben/data/tenx_ladder/tenx-0640k
+      #
+      # 640k is the LAST R-readable rung, so it is the last one this plan can
+      # run: at 1.31M cells nnz is 2.62e9, past the 2^31 that R's integers
+      # hold. anndataR reads the int64 indptr, overflows it to NA, and drops
+      # layers/counts with only a warning -- the AnnData comes back with no
+      # counts at all rather than failing outright. The full rung needs an
+      # all-python/GPU upstream, not a bigger box.
       # - id: tenx-1306k
       #   name: "TENx ladder: 1.31M cells (whole dataset)"
       #   <<: *ladder
       #   parameters:
-      #     - uri: file:///home/b/phd/data/tenx_ladder/tenx-1306k
+      #     - uri: file:///home/ben/data/tenx_ladder/tenx-1306k
 
   # -------------------------------------------------------------------------
   # FILT / NORM / FEAT: scaffolding, not methods under test. One module, one
