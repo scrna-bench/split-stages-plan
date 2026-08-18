@@ -320,6 +320,22 @@ stages:
           commit: 646f1e4
           entrypoint: graph-r
 
+  - id: GEOM-M
+    inputs:
+      - pcas_tsv
+      - neighbors_h5
+    outputs:
+      - id: geometry_metrics
+        path: "{dataset}_geometry_metrics.json"
+    modules:
+      - id: geometry-metrics-py
+        name: "Euclidean-geodesic geometry metrics"
+        software_environment: "metrics"
+        repository:
+          url: https://github.com/omni-scrna/metrics
+          commit: fb2895b43ce150db0bf54dfd840c9007084ec29a
+          entrypoint: geometry-py
+
   - id: CLUST
     inputs:
       - neighbors_h5
