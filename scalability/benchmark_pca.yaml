@@ -146,8 +146,13 @@ stages:
         software_environment: scrapper
         repository:
           url: https://github.com/omni-scrna/scrapper
-          commit: 11dac85
+          commit: 90903c2
           entrypoint: filter
+        parameters:
+          # delayed: read counts as a DelayedArray instead of materialising
+          # them. Set on every rung, not just the big one, so one read path
+          # spans the whole curve and the points stay comparable.
+          - backend: delayed
 
   - id: NORM
     inputs:
@@ -163,8 +168,10 @@ stages:
         software_environment: scrapper
         repository:
           url: https://github.com/omni-scrna/scrapper
-          commit: 11dac85
+          commit: 90903c2
           entrypoint: normalize
+        parameters:
+          - backend: delayed
 
   - id: FEAT
     inputs:
@@ -182,15 +189,15 @@ stages:
         software_environment: scrapper
         repository:
           url: https://github.com/omni-scrna/scrapper
-          commit: 11dac85
+          commit: 90903c2
           entrypoint: select
         parameters:
-          # Genes fixed across every rung: cells are the axis being varied.
+          # one list item: a second "- " would sweep two configurations.
           - number_selected: 2000
+            backend: delayed
 
   # -------------------------------------------------------------------------
-  # PCA: the only thing actually under test. Solvers are the second axis, so
-  # a run yields one curve per solver.
+  # PCA: the only thing actually under test
   # -------------------------------------------------------------------------
   - id: PCA
     inputs:
@@ -204,9 +211,7 @@ stages:
       - id: pc-rapids
         name: "rapids-singlecell PCA (GPU)"
         software_environment: rapids_singlecell
-        # Capability gating needs omnibenchmark >0.6 (`ob run --with-capability
-        # gpu`). The `ob` pinned here is 0.5.3, which does not gate -- on a box
-        # with no GPU this module must be commented out by hand instead.
+        # Capability gating needs omnibenchmark >0.6 (`ob run --with-capability gpu)
         requires_capabilities: [gpu]
         repository:
           url: https://github.com/omni-scrna/rapids-singlecell
@@ -216,6 +221,6 @@ stages:
           # sparse-only solvers: normalized_selected_h5 loads as CSR and the
           # module raises rather than let rsc silently swap in another solver.
           # full/jacobi are dense-only, so they are out.
-          - solver: [covariance-eigh, lanczos, randomized-halko]
-            n_components: 50
+          - solver: [lanczos, randomized-halko]
+            n_components: 30
             random_seed: *seeds
