@@ -138,19 +138,22 @@ stages:
     outputs:
       - id: filtered_cellids
         path: "{dataset}_cellids.txt.gz"
+      - id: filtered_featureids
+        path: "{dataset}_featureids.txt.gz"
     modules:
       - id: fi-scrapper
         name: "scrapper-style filtering"
         software_environment: scrapper
         repository:
           url: https://github.com/omni-scrna/scrapper
-          commit: 18843a7
+          commit: 11dac85
           entrypoint: filter
 
   - id: NORM
     inputs:
       - rawdata_h5ad
       - filtered_cellids
+      - filtered_featureids
     outputs:
       - id: normalized_h5
         path: "{dataset}_normalized.h5"
@@ -160,7 +163,7 @@ stages:
         software_environment: scrapper
         repository:
           url: https://github.com/omni-scrna/scrapper
-          commit: 18843a7
+          commit: 11dac85
           entrypoint: normalize
 
   - id: FEAT
@@ -168,6 +171,7 @@ stages:
       - rawdata_h5ad
       - normalized_h5
       - filtered_cellids
+      - filtered_featureids
       - properties_info
     outputs:
       - id: normalized_selected_h5
@@ -178,7 +182,7 @@ stages:
         software_environment: scrapper
         repository:
           url: https://github.com/omni-scrna/scrapper
-          commit: 18843a7
+          commit: 11dac85
           entrypoint: select
         parameters:
           # Genes fixed across every rung: cells are the axis being varied.
