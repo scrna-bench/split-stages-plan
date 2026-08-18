@@ -24,6 +24,9 @@ software_environments:
   rapids_singlecell:
     name: rapids-singlecell GPU env (cu13 wheels; needs an NVIDIA GPU)
     conda: ../envs/rapids-singlecell.yml
+  pca_biocsingular:
+    name: BiocSingular PCA (CPU)
+    conda: ../envs/pca-biocsingular-r.yml
 
 # ---------------------------------------------------------------------------
 # Anchors. Not schema keys -- omnibenchmark ignores unknown top-level keys,
@@ -146,7 +149,7 @@ stages:
         software_environment: scrapper
         repository:
           url: https://github.com/omni-scrna/scrapper
-          commit: 90903c2
+          commit: 53640f2
           entrypoint: filter
         parameters:
           # delayed: read counts as a DelayedArray instead of materialising
@@ -168,7 +171,7 @@ stages:
         software_environment: scrapper
         repository:
           url: https://github.com/omni-scrna/scrapper
-          commit: 90903c2
+          commit: 53640f2
           entrypoint: normalize
         parameters:
           - backend: delayed
@@ -189,7 +192,7 @@ stages:
         software_environment: scrapper
         repository:
           url: https://github.com/omni-scrna/scrapper
-          commit: 90903c2
+          commit: 53640f2
           entrypoint: select
         parameters:
           # one list item: a second "- " would sweep two configurations.
@@ -222,5 +225,28 @@ stages:
           # module raises rather than let rsc silently swap in another solver.
           # full/jacobi are dense-only, so they are out.
           - solver: [lanczos, randomized-halko]
+            n_components: 30
+            random_seed: *seeds
+
+      # CPU reference for the GPU arms above. Solvers are paired by family and
+      # the representation is held constant (sparse both sides):
+      #   Krylov      lanczos          | irlba
+      #   randomized  randomized-halko | random
+      - id: pc-biocsingular
+        name: "BiocSingular PCA (CPU)"
+        software_environment: pca_biocsingular
+        repository:
+          url: https://github.com/btraven00/pca-biosingular-r
+          commit: c2ff957
+          entrypoint: pca
+        parameters:
+          # q = power iterations for --solver random; ignored by irlba, which
+          # is why it can sit on the shared line. 7 rather than rsvd's default
+          # of 2 because rapids hardcodes n_iter=7 (sklearn's "auto" at this
+          # shape) and does not expose it -- 2 would compare the defaults, not
+          # the libraries, and loses PC31+ (|cor| 0.275 vs 0.866 at q=7).
+          - solver: [irlba, random]
+            dense: "false"
+            power_iters: 7
             n_components: 30
             random_seed: *seeds
