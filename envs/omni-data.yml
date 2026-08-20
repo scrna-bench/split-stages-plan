@@ -4,5 +4,9 @@ channels:
 - conda-forge
 - nodefaults
 dependencies:
-- hapiq *
+# Pinned, not `hapiq *`: the builds are all 0.0.0.dev<commit>, so conda orders
+# them by version STRING, not by date -- `*` lands on dev.fe06d05 (2026-04-30),
+# which has no `--directory` and fetches an http directory as its index page.
+# This is the newest build (2026-08-12); it has the flag uri_type needs.
+- hapiq ==0.0.0.dev5224e43
 - bash *
