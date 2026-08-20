@@ -15,15 +15,18 @@ software_backend: "conda"
 # Env paths resolve relative to THIS file, not to the invocation directory,
 # hence ../envs/ -- the envs stay shared with benchmark_conda.yaml at the root.
 software_environments:
-  scrapper:
-    name: scrapper multi-module
-    conda: ../envs/scrapper.yml
   omni_data:
     name: omni-data fixture loader
     conda: ../envs/omni-data.yml
+  scrapper:
+    name: scrapper multi-module
+    conda: ../envs/scrapper.yml
   rapids_singlecell:
     name: rapids-singlecell GPU env (cu13 wheels; needs an NVIDIA GPU)
     conda: ../envs/rapids-singlecell.yml
+  scanpy:
+    name: scanpy CPU
+    conda: ../envs/scanpy.yml
   pca_biocsingular:
     name: BiocSingular PCA (CPU)
     conda: ../envs/pca-biocsingular-r.yml
@@ -34,13 +37,20 @@ software_environments:
 # ---------------------------------------------------------------------------
 
 # Every ladder rung is the SAME omni-data module pointed at a different
-# directory on disk, so the module body is written once here and merged in
+# published directory, so the module body is written once here and merged in
 # with `<<`. Only `id`, `name` and the uri differ per rung.
+#
+# The commit is omni-data main: `uri_type` landed after eb4d368, and without it
+# an http directory is fetched as a single file -- hapiq saves the server's
+# index page under the rung's name and every declared output goes missing. That
+# path also needs a hapiq new enough to have `--directory`; ../envs/omni-data.yml
+# pins one (`hapiq *` resolves by version string, not by date, and lands on an
+# older build that lacks the flag).
 ladder_module: &ladder
   software_environment: omni_data
   repository:
     url: https://github.com/btraven00/omni-data
-    commit: eb4d368b5e83b26389e6047dd8bad6badede78f8
+    commit: 80611e83d13c8bd0d15fbc033c6a5e1a7900a0b8
 
 # One seed. Seed spread is a different experiment from size scaling -- adding
 # seeds here multiplies every rung and blurs the curve with within-point
@@ -49,9 +59,10 @@ seeds: &seeds [42]
 
 stages:
   # -------------------------------------------------------------------------
-  # DATA: the ladder. Built by build_tenx_ladder.py; rungs double, and each is
-  # a strict subset of the next (verified all-pairs), so a change along the
-  # curve is "more cells", not "different cells".
+  # DATA: the ladder. Built by the omni-tenxbrain-ladder benchmark (EH1039 via
+  # omni-data, nested draws via omni-scsampler) and published as one directory
+  # per rung; rungs double, and each is a strict subset of the next, so a
+  # change along the curve is "more cells", not "different cells".
   #
   # The module id IS {dataset}: api 0.4 passes it as --name and the stage
   # outputs are "{dataset}.h5ad", so each id must match the stem the files are
@@ -76,63 +87,65 @@ stages:
         name: "TENx ladder: 5k cells"
         <<: *ladder
         parameters:
-          - uri: file:///home/ben/data/tenx_ladder/tenx-0005k
+          - uri: https://omnibenchmark.mls.uzh.ch/datasets/tenxbrain_ladder/tenx-0005k/
+            uri_type: directory
       - id: tenx-0010k
         name: "TENx ladder: 10k cells"
         <<: *ladder
         parameters:
-          - uri: file:///home/ben/data/tenx_ladder/tenx-0010k
+          - uri: https://omnibenchmark.mls.uzh.ch/datasets/tenxbrain_ladder/tenx-0010k/
+            uri_type: directory
       - id: tenx-0020k
         name: "TENx ladder: 20k cells"
         <<: *ladder
         parameters:
-          - uri: file:///home/ben/data/tenx_ladder/tenx-0020k
+          - uri: https://omnibenchmark.mls.uzh.ch/datasets/tenxbrain_ladder/tenx-0020k/
+            uri_type: directory
       - id: tenx-0040k
         name: "TENx ladder: 40k cells"
         <<: *ladder
         parameters:
-          - uri: file:///home/ben/data/tenx_ladder/tenx-0040k
+          - uri: https://omnibenchmark.mls.uzh.ch/datasets/tenxbrain_ladder/tenx-0040k/
+            uri_type: directory
       - id: tenx-0080k
         name: "TENx ladder: 80k cells"
         <<: *ladder
         parameters:
-          - uri: file:///home/ben/data/tenx_ladder/tenx-0080k
+          - uri: https://omnibenchmark.mls.uzh.ch/datasets/tenxbrain_ladder/tenx-0080k/
+            uri_type: directory
       - id: tenx-0160k
         name: "TENx ladder: 160k cells"
         <<: *ladder
         parameters:
-          - uri: file:///home/ben/data/tenx_ladder/tenx-0160k
-      # ---- rungs past here have not been run end to end yet. Known ceilings:
-      # in-memory R upstream (scrapper FILT/NORM/FEAT) and 8GB VRAM at PCA.
-      # Uncomment one rung at a time.
+          - uri: https://omnibenchmark.mls.uzh.ch/datasets/tenxbrain_ladder/tenx-0160k/
+            uri_type: directory
+      # Uncomment one rung at a time!
+      # ---- rungs past here have not fully been tested end to end yet.
       # - id: tenx-0320k
       #   name: "TENx ladder: 320k cells"
       #   <<: *ladder
       #   parameters:
-      #     - uri: file:///home/ben/data/tenx_ladder/tenx-0320k
+      #     - uri: https://omnibenchmark.mls.uzh.ch/datasets/tenxbrain_ladder/tenx-0320k/
+      #       uri_type: directory
       # - id: tenx-0640k
       #   name: "TENx ladder: 640k cells"
       #   <<: *ladder
       #   parameters:
-      #     - uri: file:///home/ben/data/tenx_ladder/tenx-0640k
-      #
-      # 640k is the LAST R-readable rung, so it is the last one this plan can
-      # run: at 1.31M cells nnz is 2.62e9, past the 2^31 that R's integers
-      # hold. anndataR reads the int64 indptr, overflows it to NA, and drops
-      # layers/counts with only a warning -- the AnnData comes back with no
-      # counts at all rather than failing outright. The full rung needs an
-      # all-python/GPU upstream, not a bigger box.
+      #     - uri: https://omnibenchmark.mls.uzh.ch/datasets/tenxbrain_ladder/tenx-0640k/
+      #       uri_type: directory
       # - id: tenx-1306k
       #   name: "TENx ladder: 1.31M cells (whole dataset)"
       #   <<: *ladder
       #   parameters:
-      #     - uri: file:///home/ben/data/tenx_ladder/tenx-1306k
-
+      #     - uri: https://omnibenchmark.mls.uzh.ch/datasets/tenxbrain_ladder/tenx-1306k/
+      #       uri_type: directory
   # -------------------------------------------------------------------------
   # FILT / NORM / FEAT: scaffolding, not methods under test. One module, one
-  # parameter set each -- the only job is to hand PCA a normalized, 2000-gene
+  # parameter set each. Their only job is to hand PCA a normalized, 2000-gene
   # matrix. These are CPU/R and will dominate wall-clock at the top rungs;
   # they are NOT part of the scalability measurement.
+  # It's probably a good idea to switch to python at some point, depending on
+  # time and memory results.
   # -------------------------------------------------------------------------
   - id: FILT
     inputs:
@@ -200,7 +213,7 @@ stages:
             backend: delayed
 
   # -------------------------------------------------------------------------
-  # PCA: the only thing actually under test
+  # PCA: the only thing actually under test here
   # -------------------------------------------------------------------------
   - id: PCA
     inputs:
@@ -210,21 +223,37 @@ stages:
         path: "{dataset}_pcas.tsv"
       - id: loadings_tsv
         path: "{dataset}_loadings.tsv"
+
     modules:
-      - id: pc-rapids
-        name: "rapids-singlecell PCA (GPU)"
-        software_environment: rapids_singlecell
-        # Capability gating needs omnibenchmark >0.6 (`ob run --with-capability gpu)
-        requires_capabilities: [gpu]
+      # scanpy: arpack only. Its "randomized" arm is silently coerced to arpack
+      # on sparse input (scanpy warns and swaps), so it would be a duplicate
+      # job, not a second solver -- see the module's own pca.py header.
+      - id: pc-scanpy
+        name: "scanpy PCA (arpack)"
+        software_environment: scanpy
         repository:
-          url: https://github.com/omni-scrna/rapids-singlecell
-          commit: 4fc9d36
+          url: https://github.com/omni-scrna/scanpy
+          commit: cbe492b
           entrypoint: pca
         parameters:
-          # sparse-only solvers: normalized_selected_h5 loads as CSR and the
-          # module raises rather than let rsc silently swap in another solver.
-          # full/jacobi are dense-only, so they are out.
-          - solver: [lanczos, randomized-halko]
+          - solver: arpack
+            dense: "false"
+            n_components: 30
+            random_seed: *seeds
+
+      # scrapper ships libscran's own C++ irlba over Eigen (no BLAS at all),
+      # so it is a third Krylov point next to rapids lanczos and BiocSingular
+      # irlba. It has no randomized solver -- there is nothing to pair.
+      - id: pc-scrapper
+        name: "scrapper PCA (libscran irlba)"
+        software_environment: scrapper
+        repository:
+          url: https://github.com/omni-scrna/scrapper
+          commit: 53640f2
+          entrypoint: pca
+        parameters:
+          - solver: irlba
+            dense: "false"
             n_components: 30
             random_seed: *seeds
 
@@ -250,3 +279,21 @@ stages:
             power_iters: 7
             n_components: 30
             random_seed: *seeds
+
+      - id: pc-rapids
+        name: "rapids-singlecell PCA (GPU)"
+        software_environment: rapids_singlecell
+        # Capability gating needs omnibenchmark >0.6 (`ob run --with-capability gpu)
+        requires_capabilities: [gpu]
+        repository:
+          url: https://github.com/omni-scrna/rapids-singlecell
+          commit: 4fc9d36
+          entrypoint: pca
+        parameters:
+          # sparse-only solvers: normalized_selected_h5 loads as CSR and the
+          # module raises rather than let rsc silently swap in another solver.
+          # full/jacobi are dense-only, so they are out.
+          - solver: [lanczos, randomized-halko]
+            n_components: 30
+            random_seed: *seeds
+
