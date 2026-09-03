@@ -331,6 +331,11 @@ stages:
     modules:
       - id: geometry-metrics-py
         name: "Pairwise representation geometry metrics"
+        software_environment: "metrics"
+        repository:
+          url: https://github.com/omni-scrna/metrics
+          commit: 4ce6b6d
+          entrypoint: geometry-py
 
   - id: CLUST
     inputs:
