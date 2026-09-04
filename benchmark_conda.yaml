@@ -52,6 +52,13 @@ software_environments:
   count-factor:
     name: count-factor
     conda: envs/cntfct.yml
+  # The rapids arms are GPU-only, so they declare `requires_capabilities: [gpu]`
+  # and are pruned from the DAG unless the run passes `--with-capability gpu`.
+  # That field needs omnibenchmark >= 0.7.0; older versions ignore it and would
+  # schedule these modules on a CPU host.
+  rapids_singlecell:
+    name: rapids-singlecell (GPU)
+    conda: envs/rapids-singlecell.yml
 
 
 stages:
@@ -258,6 +265,27 @@ stages:
           - solver: [exact, irlba, random]
             n_components: 50
             random_seed: 42
+      # GPU arms. `--solver` is pinned to the input density it is valid for:
+      # rsc dispatches on density before the solver and would silently
+      # substitute, so the module raises rather than mis-report. Both of these
+      # are the sparse-input solvers. covariance-eigh is the exact control
+      # (constant to 1.5e-3 deg across seeds); randomized-halko is genuinely
+      # seed-sensitive and is the arm that carries PCA variance.
+      - id: pc-rapids
+        name: "rapids-singlecell PCA (GPU)"
+        software_environment: "rapids_singlecell"
+        requires_capabilities: [gpu]
+        exclude:
+          - d-feat-sel
+          - d-annotation
+        repository:
+          url: https://github.com/omni-scrna/rapids-singlecell
+          commit: b84e28a
+          entrypoint: pca
+        parameters:
+          - solver: [covariance-eigh, randomized-halko]
+            n_components: 50
+            random_seed: 42
 
   - id: EMBED-M
     inputs:
@@ -303,6 +331,19 @@ stages:
           - n_neighbors: 15
             random_seed: 42
             flavor: "umap"
+      - id: nn-rapids
+        name: "rapids-singlecell KNN graph (GPU)"
+        software_environment: "rapids_singlecell"
+        requires_capabilities: [gpu]
+        repository:
+          url: https://github.com/omni-scrna/rapids-singlecell
+          commit: b84e28a
+          entrypoint: knn
+        parameters:
+          # rsc.pp.neighbors at the cuVS default
+          - n_neighbors: 15
+            random_seed: 42
+            flavor: "rapids"
 
   - id: GRAPH-M
     inputs:
@@ -370,7 +411,22 @@ stages:
             resolution: [0.5, 1.0]
             walktrap_steps: [2, 4]
             random_seed: 42
-        
+      - id: cl-rapids
+        name: "rapids-singlecell graph clustering (GPU)"
+        software_environment: "rapids_singlecell"
+        requires_capabilities: [gpu]
+        repository:
+          url: https://github.com/omni-scrna/rapids-singlecell
+          commit: b84e28a
+          entrypoint: cluster
+        parameters:
+          - method: "rapids-leiden"
+            resolution: [0.5, 1.0]
+            random_seed: 42
+          # rsc louvain has no seed parameter
+          - method: "rapids-louvain"
+            resolution: [0.5, 1.0]
+
   - id: CLUST-M
     inputs:
       - clusters_tsv
@@ -544,6 +600,30 @@ stages:
             cluster_method: "xi"
             xi: 0.05
             random_seed: 42
+      - id: cl-rapids-embed
+        name: "rapids-singlecell embedding clustering (GPU)"
+        software_environment: "rapids_singlecell"
+        requires_capabilities: [gpu]
+        repository:
+          url: https://github.com/omni-scrna/rapids-singlecell
+          commit: b84e28a
+          entrypoint: cluster_embedding
+        parameters:
+          - method: "rapids-kmeans"
+            n_clusters: [10, 20]
+            random_seed: 42
+          # hdbscan and dbscan have no seed parameter; 
+          # Both emit -1 for noise points, which CLUST-M has to handle.
+          - method: "rapids-hdbscan"
+            min_samples: [10, 30]
+            min_cluster_size: 25
+          # eps is an absolute distance in PCA space, so it does not transfer
+          # across datasets or n_components. Measured on be1 (50 PCs): kNN
+          # distances run 4.2-35.6, median 11.8 -- eps 0.5/1.0 was below the
+          # closest pair in the data and labelled every cell noise.
+          - method: "rapids-dbscan"
+            eps: [10, 14]
+            min_samples: [10, 30]
 
   - id: ANNO
     inputs:
